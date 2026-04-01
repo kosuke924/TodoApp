@@ -1,1 +1,1100 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>時給カウンター Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --panel: #0d1117;
+    --panel2: #111820;
+    --border: #1e2d3d;
+    --accent: #00e5ff;
+    --accent2: #ff6b00;
+    --accent3: #c8f500;
+    --night: #7b2fff;
+    --night-soft: rgba(123,47,255,0.15);
+    --text: #cdd9e5;
+    --muted: #4a5568;
+    --dim: #2d3748;
+    --reward: #ff9f43;
+    --reward-soft: rgba(255,159,67,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 40px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,229,255,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 80% 80%, rgba(123,47,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  body.night-mode::before {
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(123,47,255,0.1) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 20% 80%, rgba(255,107,0,0.05) 0%, transparent 60%);
+  }
+
+  /* Grid */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    width: min(560px, 100%);
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--muted); }
+
+  .night-badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--night-soft);
+    border: 1px solid var(--night);
+    padding: 4px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: #a78bfa;
+    animation: nightPulse 2s ease-in-out infinite;
+  }
+  .night-badge.show { display: flex; }
+  .night-badge::before { content: '🌙'; font-size: 12px; }
+
+  @keyframes nightPulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* ===== MAIN DISPLAY ===== */
+  .main-display {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 28px 24px 24px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.5s;
+  }
+
+  .main-display::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transform: scaleX(0);
+    transition: transform 0.4s ease, background 0.5s;
+  }
+  .main-display.running::before { transform: scaleX(1); }
+  .main-display.night::before { background: linear-gradient(90deg, transparent, var(--night), transparent); }
+  .main-display.night { border-color: rgba(123,47,255,0.4); }
+
+  .rate-tag {
+    position: absolute;
+    top: 12px; left: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rate-pill {
+    background: rgba(200,245,0,0.1);
+    border: 1px solid rgba(200,245,0,0.3);
+    color: var(--accent3);
+    padding: 2px 7px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+  .rate-pill.night { background: rgba(123,47,255,0.2); border-color: var(--night); color: #a78bfa; }
+
+  .amount {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(48px, 12vw, 78px);
+    line-height: 1;
+    text-align: right;
+    color: var(--accent);
+    transition: color 0.5s;
+    white-space: nowrap;
+    margin-top: 10px;
+  }
+  .amount.night { color: #a78bfa; }
+
+  .amount .yen { font-size: 0.42em; vertical-align: top; margin-top: 8px; color: var(--muted); margin-right: 2px; }
+  .amount .dec { font-size: 0.38em; vertical-align: bottom; margin-bottom: 6px; color: var(--muted); }
+
+  @keyframes coinFlash {
+    0% { color: #fff; text-shadow: 0 0 20px #fff; }
+    100% { color: var(--accent); text-shadow: none; }
+  }
+  @keyframes nightFlash {
+    0% { color: #fff; text-shadow: 0 0 20px #a78bfa; }
+    100% { color: #a78bfa; text-shadow: none; }
+  }
+  .amount.flash { animation: coinFlash 0.2s ease-out; }
+  .amount.night.flash { animation: nightFlash 0.2s ease-out; }
+
+  /* ===== STATS ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .stat-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 12px 10px;
+  }
+
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .stat-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 19px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-val small { font-size: 11px; color: var(--muted); }
+
+  /* ===== NIGHT INFO BAR ===== */
+  .night-info {
+    display: none;
+    background: var(--night-soft);
+    border: 1px solid rgba(123,47,255,0.3);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: #a78bfa;
+    letter-spacing: 0.1em;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .night-info.show { display: flex; }
+  .night-info .multiplier { font-size: 16px; color: var(--night); font-weight: bold; }
+
+  /* ===== TABS ===== */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+    gap: 0;
+  }
+
+  .tab {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    padding: 8px 16px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ===== SETTINGS ===== */
+  .settings {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .input-group { display: flex; flex-direction: column; gap: 5px; }
+
+  .input-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .input-wrap { position: relative; }
+
+  .input-prefix {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  input[type="number"], input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 17px;
+    padding: 9px 10px 9px 26px;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input:focus { border-color: var(--accent); }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .toggle-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toggle-label .icon { font-size: 14px; }
+
+  .toggle {
+    position: relative;
+    width: 44px; height: 22px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--dim);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 2px; top: 2px;
+    background: var(--muted);
+    transition: 0.3s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(123,47,255,0.3); border-color: var(--night); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(22px); background: var(--night); }
+
+  /* Night schedule */
+  .night-schedule {
+    display: none;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .night-schedule.show { display: grid; }
+
+  /* ===== CONTROLS ===== */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 13px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:active { transform: scale(0.97); }
+
+  .btn-start { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: bold; }
+  .btn-start:hover { filter: brightness(1.15); }
+  .btn-stop { background: transparent; color: var(--accent2); border-color: var(--accent2); }
+  .btn-stop:hover { background: rgba(255,107,0,0.1); }
+  .btn-reset { grid-column: span 2; background: transparent; color: var(--dim); border-color: var(--dim); font-size: 10px; padding: 9px; }
+  .btn-reset:hover { color: var(--muted); border-color: var(--muted); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ===== REWARD NOTIFICATIONS ===== */
+  .reward-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 18px;
+  }
+
+  /* Permission banner */
+  .notif-permission {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--reward-soft);
+    border: 1px solid rgba(255,159,67,0.3);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+  }
+  .notif-permission.granted { background: rgba(200,245,0,0.07); border-color: rgba(200,245,0,0.25); }
+  .notif-permission.denied { background: rgba(255,107,0,0.07); border-color: rgba(255,107,0,0.25); }
+
+  .notif-perm-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--reward);
+    flex: 1;
+  }
+  .notif-permission.granted .notif-perm-text { color: var(--accent3); }
+  .notif-permission.denied .notif-perm-text { color: var(--accent2); }
+
+  .btn-perm {
+    background: var(--reward);
+    color: var(--bg);
+    border-color: var(--reward);
+    font-size: 9px;
+    padding: 6px 12px;
+    width: auto;
+    grid-column: unset;
+    white-space: nowrap;
+  }
+  .btn-perm:hover { filter: brightness(1.1); }
+
+  /* Reward list */
+  .reward-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .reward-item {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .reward-item.triggered { border-color: rgba(255,159,67,0.5); }
+  .reward-item.triggered::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--reward), transparent);
+  }
+
+  .reward-name {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 700;
+  }
+  .reward-amount-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .reward-target {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 15px;
+    color: var(--reward);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Progress bar under reward item */
+  .reward-progress-wrap {
+    grid-column: span 3;
+    height: 3px;
+    background: var(--border);
+    margin-top: 2px;
+  }
+  .reward-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--reward), var(--accent3));
+    transition: width 0.5s ease;
+    max-width: 100%;
+  }
+
+  .btn-del {
+    background: transparent;
+    color: var(--dim);
+    border-color: var(--dim);
+    font-size: 14px;
+    padding: 4px 8px;
+    width: auto;
+    grid-column: unset;
+    line-height: 1;
+  }
+  .btn-del:hover { color: var(--accent2); border-color: var(--accent2); }
+
+  /* Add reward form */
+  .add-reward-form {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .add-reward-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .add-reward-row {
+    display: grid;
+    grid-template-columns: 1fr 120px auto;
+    gap: 8px;
+    align-items: end;
+  }
+
+  input.reward-input {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .btn-add-reward {
+    background: var(--reward);
+    color: var(--bg);
+    border-color: var(--reward);
+    font-size: 10px;
+    padding: 9px 12px;
+    width: auto;
+    grid-column: unset;
+    white-space: nowrap;
+  }
+  .btn-add-reward:hover { filter: brightness(1.1); }
+
+  /* Big reward popup overlay */
+  .reward-popup {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .reward-popup.show { opacity: 1; pointer-events: auto; }
+
+  .reward-popup-inner {
+    background: var(--panel);
+    border: 2px solid var(--reward);
+    padding: 32px 40px;
+    text-align: center;
+    max-width: 320px;
+    position: relative;
+    animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 0 60px rgba(255,159,67,0.3);
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .popup-emoji { font-size: 48px; margin-bottom: 12px; display: block; }
+  .popup-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .popup-msg {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 18px;
+  }
+  .popup-amount {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    color: var(--reward);
+    margin-bottom: 20px;
+    display: block;
+  }
+  .btn-popup-close {
+    background: var(--reward);
+    color: var(--bg);
+    border-color: var(--reward);
+    padding: 10px 28px;
+    font-size: 11px;
+  }
+  .btn-popup-close:hover { filter: brightness(1.1); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    padding: 12px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    transition: transform 0.3s ease;
+    z-index: 100;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.night-toast { border-color: var(--night); color: #a78bfa; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">WAGE<span>/</span>PRO</div>
+    <div class="night-badge" id="nightBadge">深夜手当 適用中</div>
+  </div>
+
+  <!-- Main display -->
+  <div class="main-display" id="mainDisplay">
+    <div class="rate-tag">
+      EARNED
+      <span class="rate-pill" id="ratePill">通常レート</span>
+    </div>
+    <div class="amount" id="amountEl">
+      <span class="yen">¥</span><span id="intPart">0</span><span class="dec">.<span id="decPart">00</span></span>
+    </div>
+  </div>
+
+  <!-- Night info bar -->
+  <div class="night-info" id="nightInfo">
+    <span>🌙 深夜手当 22:00〜翌5:00 自動適用</span>
+    <span class="multiplier" id="multiplierLabel">×1.25</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <span class="stat-label">経過時間</span>
+      <div class="stat-val" id="elapsedEl">00:00:00</div>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">毎秒</span>
+      <div class="stat-val">¥<span id="perSecEl">0.000</span></div>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">実効時給</span>
+      <div class="stat-val">¥<span id="effectiveEl">0</span></div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn-start" id="btnStart" onclick="startCounter()">▶ スタート</button>
+    <button class="btn-stop" id="btnStop" onclick="stopCounter()" disabled>■ ストップ</button>
+    <button class="btn-reset" onclick="resetCounter()">↺ リセット</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('settings', this)">⚙ 設定</div>
+    <div class="tab" onclick="switchTab('reward', this)">🎁 ご褒美通知</div>
+  </div>
+
+  <!-- Settings tab -->
+  <div class="tab-content active" id="tab-settings">
+    <div class="settings">
+      <div class="section-title">基本設定 // BASIC CONFIG</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <span class="input-label">通常時給 (円)</span>
+          <div class="input-wrap">
+            <span class="input-prefix">¥</span>
+            <input type="number" id="wage" value="1200" min="1" step="50" oninput="updateCalc()">
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-label">勤務時間 (h)</span>
+          <div class="input-wrap">
+            <span class="input-prefix">h</span>
+            <input type="number" id="hours" value="8" min="0.5" max="24" step="0.5" oninput="updateCalc()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Night shift toggle -->
+      <div class="toggle-row">
+        <span class="toggle-label"><span class="icon">🌙</span> 深夜手当を自動適用（22:00〜翌5:00）</span>
+        <label class="toggle">
+          <input type="checkbox" id="nightToggle" checked onchange="toggleNight()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Night schedule settings -->
+      <div class="night-schedule show" id="nightSchedule">
+        <div class="input-group">
+          <span class="input-label">開始時刻</span>
+          <div class="input-wrap">
+            <input type="number" id="nightStart" value="22" min="0" max="23" step="1" style="padding-left:10px" oninput="updateCalc()">
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-label">終了時刻</span>
+          <div class="input-wrap">
+            <input type="number" id="nightEnd" value="5" min="0" max="12" step="1" style="padding-left:10px" oninput="updateCalc()">
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-label">倍率</span>
+          <div class="input-wrap">
+            <input type="number" id="nightRate" value="1.25" min="1.01" max="2" step="0.05" style="padding-left:10px" oninput="updateCalc()">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reward tab -->
+  <div class="tab-content" id="tab-reward">
+    <div class="reward-panel">
+      <div class="section-title">🎁 ご褒美通知 // REWARD ALERTS</div>
+
+      <!-- Notification permission -->
+      <div class="notif-permission" id="permBanner">
+        <span class="notif-perm-text" id="permText">🔔 目標達成時にブラウザ通知を送ります</span>
+        <button class="btn-perm" onclick="requestNotifPermission()">通知を許可する</button>
+      </div>
+
+      <!-- Reward list -->
+      <div class="reward-list" id="rewardList"></div>
+
+      <!-- Add reward form -->
+      <div class="add-reward-form">
+        <div class="add-reward-title">+ 新しいご褒美を追加</div>
+        <div class="add-reward-row">
+          <div class="input-group">
+            <span class="input-label">ご褒美の名前</span>
+            <input type="text" id="rewardName" class="reward-input" placeholder="スタバ新作" maxlength="20" style="padding-left:10px">
+          </div>
+          <div class="input-group">
+            <span class="input-label">目標金額</span>
+            <div class="input-wrap">
+              <span class="input-prefix">¥</span>
+              <input type="number" id="rewardAmount" class="reward-input" value="700" min="1" step="100">
+            </div>
+          </div>
+          <button class="btn-add-reward" onclick="addReward()">追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Reward popup overlay -->
+<div class="reward-popup" id="rewardPopup">
+  <div class="reward-popup-inner">
+    <span class="popup-emoji" id="popupEmoji">🎉</span>
+    <div class="popup-title">GOAL REACHED!</div>
+    <div class="popup-msg" id="popupMsg">お疲れさま！</div>
+    <span class="popup-amount" id="popupAmount">¥0</span>
+    <button class="btn-popup-close" onclick="closePopup()">やったー！</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== STATE =====
+  let running = false;
+  let startTime = null;
+  let pausedElapsed = 0;
+  let rafId = null;
+  let lastInt = -1;
+  let lastNight = null;
+
+  // Rewards
+  let rewards = [
+    { id: 1, name: 'スタバ新作', amount: 700,  triggered: false, emoji: '☕' },
+    { id: 2, name: 'ラーメン大盛り', amount: 1200, triggered: false, emoji: '🍜' },
+    { id: 3, name: '今夜の打ち上げ', amount: 3000, triggered: false, emoji: '🍻' },
+  ];
+  let rewardIdCounter = 10;
+
+  const REWARD_EMOJIS = ['🎉','☕','🍜','🍣','🍺','🎮','👟','🛍','💪','🌮','🍕','🎁'];
+
+  // ===== HELPERS =====
+  function getWage() { return parseFloat(document.getElementById('wage').value) || 1200; }
+  function getHours() { return parseFloat(document.getElementById('hours').value) || 8; }
+  function getNightEnabled() { return document.getElementById('nightToggle').checked; }
+  function getNightStart() { return parseInt(document.getElementById('nightStart').value) || 22; }
+  function getNightEnd() { return parseInt(document.getElementById('nightEnd').value) || 5; }
+  function getNightRate() { return parseFloat(document.getElementById('nightRate').value) || 1.25; }
+
+  function isNightTime() {
+    if (!getNightEnabled()) return false;
+    const h = new Date().getHours();
+    const s = getNightStart(), e = getNightEnd();
+    return s > e ? (h >= s || h < e) : (h >= s && h < e);
+  }
+
+  function currentRate() {
+    return isNightTime() ? getWage() * getNightRate() : getWage();
+  }
+
+  function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = 'toast'; }, 3500);
+  }
+
+  function getCurrentEarned() {
+    if (!running && pausedElapsed === 0) return 0;
+    const totalMs = running ? pausedElapsed + (Date.now() - startTime) : pausedElapsed;
+    return totalMs / 1000 * currentRate() / 3600;
+  }
+
+  // ===== NIGHT MODE UI =====
+  function updateNightUI(night) {
+    const badge = document.getElementById('nightBadge');
+    const info = document.getElementById('nightInfo');
+    const md = document.getElementById('mainDisplay');
+    const amount = document.getElementById('amountEl');
+    const pill = document.getElementById('ratePill');
+    const mult = document.getElementById('multiplierLabel');
+    if (night) {
+      badge.classList.add('show'); info.classList.add('show');
+      md.classList.add('night'); amount.classList.add('night');
+      pill.className = 'rate-pill night'; pill.textContent = `深夜×${getNightRate()}`;
+      mult.textContent = `×${getNightRate()}`; document.body.classList.add('night-mode');
+    } else {
+      badge.classList.remove('show'); info.classList.remove('show');
+      md.classList.remove('night'); amount.classList.remove('night');
+      pill.className = 'rate-pill'; pill.textContent = '通常レート';
+      document.body.classList.remove('night-mode');
+    }
+  }
+
+  // ===== REWARD CHECKS =====
+  function checkRewards(earned) {
+    rewards.forEach(r => {
+      if (!r.triggered && earned >= r.amount) {
+        r.triggered = true;
+        triggerReward(r);
+        renderRewards();
+      }
+    });
+  }
+
+  function triggerReward(r) {
+    // Popup
+    document.getElementById('popupEmoji').textContent = r.emoji;
+    document.getElementById('popupMsg').textContent = `${r.name}の金額に到達！\nお疲れさま、こーすけ！`;
+    document.getElementById('popupAmount').textContent = `¥${r.amount.toLocaleString()}`;
+    document.getElementById('rewardPopup').classList.add('show');
+
+    // Browser notification
+    if (Notification.permission === 'granted') {
+      new Notification(`${r.emoji} ご褒美タイム！`, {
+        body: `${r.name}（¥${r.amount.toLocaleString()}）に到達したで！お疲れさま🎉`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>'
+      });
+    }
+  }
+
+  function closePopup() {
+    document.getElementById('rewardPopup').classList.remove('show');
+  }
+
+  // ===== MAIN LOOP =====
+  function update() {
+    if (!running) return;
+
+    const now = Date.now();
+    const totalMs = pausedElapsed + (now - startTime);
+    const totalSec = totalMs / 1000;
+    const night = isNightTime();
+    const rate = currentRate();
+    const ratePerSec = rate / 3600;
+    const earned = totalSec * ratePerSec;
+
+    if (night !== lastNight) {
+      updateNightUI(night);
+      if (night) showToast('🌙 深夜手当が適用されました！', 'night-toast');
+      else showToast('☀️ 通常レートに戻りました');
+      lastNight = night;
+    }
+
+    const earnedInt = Math.floor(earned);
+    const earnedDec = String(Math.floor((earned - earnedInt) * 100)).padStart(2, '0');
+
+    if (earnedInt !== lastInt) {
+      const el = document.getElementById('amountEl');
+      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+      lastInt = earnedInt;
+      // Update reward progress bars
+      updateRewardBars(earned);
+      // Check triggers
+      checkRewards(earned);
+    }
+
+    document.getElementById('intPart').textContent = earnedInt.toLocaleString('ja-JP');
+    document.getElementById('decPart').textContent = earnedDec;
+    document.getElementById('elapsedEl').textContent = formatTime(totalMs);
+    document.getElementById('perSecEl').textContent = ratePerSec.toFixed(3);
+    document.getElementById('effectiveEl').textContent = Math.round(rate).toLocaleString('ja-JP');
+
+    rafId = requestAnimationFrame(update);
+  }
+
+  function updateRewardBars(earned) {
+    rewards.forEach(r => {
+      const bar = document.getElementById(`bar-${r.id}`);
+      if (bar) bar.style.width = Math.min(100, earned / r.amount * 100) + '%';
+    });
+  }
+
+  // ===== CONTROLS =====
+  function startCounter() {
+    if (running) return;
+    running = true; startTime = Date.now(); lastNight = null;
+    document.getElementById('mainDisplay').classList.add('running');
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    update();
+  }
+
+  function stopCounter() {
+    if (!running) return;
+    running = false; pausedElapsed += Date.now() - startTime;
+    cancelAnimationFrame(rafId);
+    document.getElementById('mainDisplay').classList.remove('running');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    document.getElementById('btnStart').textContent = '▶ 再開';
+  }
+
+  function resetCounter() {
+    running = false; cancelAnimationFrame(rafId);
+    pausedElapsed = 0; startTime = null; lastInt = -1; lastNight = null;
+    rewards.forEach(r => r.triggered = false);
+    document.getElementById('intPart').textContent = '0';
+    document.getElementById('decPart').textContent = '00';
+    document.getElementById('elapsedEl').textContent = '00:00:00';
+    document.getElementById('mainDisplay').classList.remove('running','night');
+    document.getElementById('amountEl').classList.remove('night');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    document.getElementById('btnStart').textContent = '▶ スタート';
+    updateNightUI(false); updateCalc(); renderRewards();
+  }
+
+  function updateCalc() {
+    const rate = currentRate();
+    document.getElementById('effectiveEl').textContent = Math.round(rate).toLocaleString('ja-JP');
+    document.getElementById('perSecEl').textContent = (rate / 3600).toFixed(3);
+  }
+
+  function toggleNight() {
+    const show = document.getElementById('nightToggle').checked;
+    document.getElementById('nightSchedule').className = 'night-schedule' + (show ? ' show' : '');
+    updateCalc();
+  }
+
+  // ===== TAB =====
+  function switchTab(id, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-' + id).classList.add('active');
+  }
+
+  // ===== NOTIFICATIONS =====
+  function requestNotifPermission() {
+    if (!('Notification' in window)) {
+      showToast('⚠ このブラウザは通知に対応していません');
+      return;
+    }
+    Notification.requestPermission().then(updatePermBanner);
+  }
+
+  function updatePermBanner(perm) {
+    perm = perm || Notification.permission;
+    const banner = document.getElementById('permBanner');
+    const text = document.getElementById('permText');
+    const btn = banner.querySelector('.btn-perm');
+    if (perm === 'granted') {
+      banner.className = 'notif-permission granted';
+      text.textContent = '✅ 通知が許可されています';
+      if (btn) btn.remove();
+    } else if (perm === 'denied') {
+      banner.className = 'notif-permission denied';
+      text.textContent = '❌ 通知がブロックされています（ブラウザ設定から許可してください）';
+      if (btn) btn.remove();
+    }
+  }
+
+  // ===== REWARDS =====
+  function addReward() {
+    const name = document.getElementById('rewardName').value.trim();
+    const amount = parseInt(document.getElementById('rewardAmount').value);
+    if (!name) { showToast('⚠ ご褒美の名前を入力してね'); return; }
+    if (!amount || amount <= 0) { showToast('⚠ 金額を入力してね'); return; }
+
+    const emoji = REWARD_EMOJIS[Math.floor(Math.random() * REWARD_EMOJIS.length)];
+    const earned = getCurrentEarned();
+    rewards.push({ id: ++rewardIdCounter, name, amount, triggered: earned >= amount, emoji });
+    rewards.sort((a, b) => a.amount - b.amount);
+
+    document.getElementById('rewardName').value = '';
+    renderRewards();
+    showToast(`${emoji} 「${name}」を追加しました！`);
+  }
+
+  function deleteReward(id) {
+    rewards = rewards.filter(r => r.id !== id);
+    renderRewards();
+  }
+
+  function renderRewards() {
+    const list = document.getElementById('rewardList');
+    const earned = getCurrentEarned();
+
+    if (rewards.length === 0) {
+      list.innerHTML = `<div style="text-align:center;padding:24px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.15em">ご褒美を追加してみよう！</div>`;
+      return;
+    }
+
+    list.innerHTML = rewards.map(r => {
+      const pct = Math.min(100, earned / r.amount * 100);
+      const remaining = Math.max(0, r.amount - earned);
+      return `
+        <div class="reward-item ${r.triggered ? 'triggered' : ''}" id="item-${r.id}">
+          <div>
+            <div class="reward-name">${r.emoji} ${r.name}</div>
+            <div class="reward-amount-label">${r.triggered ? '✅ 達成！' : `あと ¥${Math.ceil(remaining).toLocaleString()}`}</div>
+          </div>
+          <div class="reward-target">¥${r.amount.toLocaleString()}</div>
+          <button class="btn-del" onclick="deleteReward(${r.id})">✕</button>
+          <div class="reward-progress-wrap">
+            <div class="reward-progress-bar" id="bar-${r.id}" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ===== INIT =====
+  updateCalc();
+  renderRewards();
+  updatePermBanner();
+  setInterval(() => { if (!running) updateNightUI(isNightTime()); }, 30000);
+  updateNightUI(isNightTime());
+</script>
+</body>
+</html>
