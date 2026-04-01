@@ -1,674 +1,223 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>時給カウンター Pro</title>
+<meta property="og:title" content="時給カウンター Pro">
+<meta property="og:description" content="リアルタイムで給料を可視化。深夜手当自動切替・目標物換算・ご褒美通知つき。">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@300;400;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #080c10;
-    --panel: #0d1117;
-    --panel2: #111820;
-    --border: #1e2d3d;
-    --accent: #00e5ff;
-    --accent2: #ff6b00;
-    --accent3: #c8f500;
-    --night: #7b2fff;
-    --night-soft: rgba(123,47,255,0.15);
-    --text: #cdd9e5;
-    --muted: #4a5568;
-    --dim: #2d3748;
-    --reward: #ff9f43;
-    --reward-soft: rgba(255,159,67,0.12);
-  }
+:root {
+  --bg: #080c10;
+  --panel: #0d1117;
+  --panel2: #111820;
+  --border: #1e2d3d;
+  --accent: #00e5ff;
+  --accent2: #ff6b00;
+  --accent3: #c8f500;
+  --night: #7b2fff;
+  --night-soft: rgba(123,47,255,0.15);
+  --text: #cdd9e5;
+  --muted: #4a5568;
+  --dim: #2d3748;
+  --reward: #ff9f43;
+  --reward-soft: rgba(255,159,67,0.12);
+  --wall: #ff4466;
+  --wall-soft: rgba(255,68,102,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Zen Kaku Gothic New',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 60px;position:relative;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(0,229,255,0.06) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(123,47,255,0.05) 0%,transparent 60%);pointer-events:none;}
+body.night-mode::before{background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(123,47,255,0.1) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 20% 80%,rgba(255,107,0,0.05) 0%,transparent 60%);}
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
+.wrap{position:relative;z-index:1;width:min(560px,100%);}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.logo{font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:0.3em;color:var(--accent);text-transform:uppercase;}
+.logo span{color:var(--muted);}
+.night-badge{display:none;align-items:center;gap:6px;background:var(--night-soft);border:1px solid var(--night);padding:4px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.15em;color:#a78bfa;animation:nightPulse 2s ease-in-out infinite;}
+.night-badge.show{display:flex;}
+.night-badge::before{content:'🌙';font-size:12px;}
+@keyframes nightPulse{0%,100%{opacity:1}50%{opacity:0.6}}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Zen Kaku Gothic New', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 16px 40px;
-    position: relative;
-    overflow-x: hidden;
-  }
+.main-display{background:var(--panel);border:1px solid var(--border);padding:28px 24px 20px;margin-bottom:12px;position:relative;overflow:hidden;transition:border-color 0.5s;}
+.main-display::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);transform:scaleX(0);transition:transform 0.4s ease,background 0.5s;}
+.main-display.running::before{transform:scaleX(1);}
+.main-display.night::before{background:linear-gradient(90deg,transparent,var(--night),transparent);}
+.main-display.night{border-color:rgba(123,47,255,0.4);}
+.rate-tag{position:absolute;top:12px;left:16px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.2em;color:var(--muted);display:flex;align-items:center;gap:8px;}
+.rate-pill{background:rgba(200,245,0,0.1);border:1px solid rgba(200,245,0,0.3);color:var(--accent3);padding:2px 7px;font-size:9px;letter-spacing:0.1em;}
+.rate-pill.night{background:rgba(123,47,255,0.2);border-color:var(--night);color:#a78bfa;}
+.amount{font-family:'Share Tech Mono',monospace;font-size:clamp(48px,12vw,78px);line-height:1;text-align:right;color:var(--accent);transition:color 0.5s;white-space:nowrap;margin-top:10px;}
+.amount.night{color:#a78bfa;}
+.amount .yen{font-size:0.42em;vertical-align:top;margin-top:8px;color:var(--muted);margin-right:2px;}
+.amount .dec{font-size:0.38em;vertical-align:bottom;margin-bottom:6px;color:var(--muted);}
+@keyframes coinFlash{0%{color:#fff;text-shadow:0 0 20px #fff}100%{color:var(--accent);text-shadow:none}}
+@keyframes nightFlash{0%{color:#fff;text-shadow:0 0 20px #a78bfa}100%{color:#a78bfa;text-shadow:none}}
+.amount.flash{animation:coinFlash 0.2s ease-out;}
+.amount.night.flash{animation:nightFlash 0.2s ease-out;}
 
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,229,255,0.06) 0%, transparent 70%),
-      radial-gradient(ellipse 40% 30% at 80% 80%, rgba(123,47,255,0.05) 0%, transparent 60%);
-    pointer-events: none;
-  }
+.target-banner{display:none;align-items:center;justify-content:space-between;background:rgba(200,245,0,0.06);border:1px solid rgba(200,245,0,0.2);padding:10px 14px;margin-top:12px;position:relative;overflow:hidden;}
+.target-banner.show{display:flex;}
+.target-banner-left{font-size:13px;font-weight:700;color:var(--text);}
+.target-banner-left .t-emoji{font-size:18px;margin-right:6px;}
+.target-banner-right{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent3);text-align:right;white-space:nowrap;margin-left:10px;}
+.target-progress-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--border);}
+.target-progress-bar{height:100%;background:linear-gradient(90deg,var(--accent3),var(--accent));transition:width 0.4s ease;max-width:100%;}
 
-  body.night-mode::before {
-    background:
-      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(123,47,255,0.1) 0%, transparent 70%),
-      radial-gradient(ellipse 40% 30% at 20% 80%, rgba(255,107,0,0.05) 0%, transparent 60%);
-  }
+.night-info{display:none;background:var(--night-soft);border:1px solid rgba(123,47,255,0.3);padding:10px 14px;margin-bottom:12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#a78bfa;letter-spacing:0.1em;justify-content:space-between;align-items:center;}
+.night-info.show{display:flex;}
+.night-info .multiplier{font-size:16px;color:var(--night);font-weight:bold;}
 
-  /* Grid */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
-    background-size: 48px 48px;
-    pointer-events: none;
-  }
+.wall-bar{display:none;background:var(--wall-soft);border:1px solid rgba(255,68,102,0.3);padding:10px 14px;margin-bottom:12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#ff8099;letter-spacing:0.1em;}
+.wall-bar.show{display:block;}
+.wall-bar-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.wall-bar-title{color:var(--wall);}
+.wall-progress-wrap{height:4px;background:var(--border);}
+.wall-progress-bar{height:100%;background:linear-gradient(90deg,var(--wall),#ff8099);transition:width 0.5s ease;max-width:100%;}
+.wall-bar.danger .wall-bar-title{animation:wallPulse 0.8s infinite;}
+@keyframes wallPulse{0%,100%{color:var(--wall)}50%{color:#fff}}
 
-  .wrap {
-    position: relative;
-    z-index: 1;
-    width: min(560px, 100%);
-  }
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;}
+.stat-box{background:var(--panel);border:1px solid var(--border);padding:12px 10px;}
+.stat-label{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:5px;display:block;}
+.stat-val{font-family:'Share Tech Mono',monospace;font-size:19px;color:var(--text);line-height:1;}
 
-  /* ===== HEADER ===== */
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-  }
+.share-btn{width:100%;background:transparent;border:1px solid #1d9bf0;color:#1d9bf0;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:0.15em;padding:11px;cursor:pointer;transition:all 0.15s;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.share-btn:hover{background:rgba(29,155,240,0.1);}
+.share-btn:active{transform:scale(0.98);}
 
-  .logo {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 13px;
-    letter-spacing: 0.3em;
-    color: var(--accent);
-    text-transform: uppercase;
-  }
-  .logo span { color: var(--muted); }
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+button{font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;padding:13px;border:1px solid;cursor:pointer;transition:all 0.15s;}
+button:active{transform:scale(0.97);}
+.btn-start{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:bold;}
+.btn-start:hover{filter:brightness(1.15);}
+.btn-stop{background:transparent;color:var(--accent2);border-color:var(--accent2);}
+.btn-stop:hover{background:rgba(255,107,0,0.1);}
+.btn-reset{grid-column:span 2;background:transparent;color:var(--dim);border-color:var(--dim);font-size:10px;padding:9px;}
+.btn-reset:hover{color:var(--muted);border-color:var(--muted);}
 
-  .night-badge {
-    display: none;
-    align-items: center;
-    gap: 6px;
-    background: var(--night-soft);
-    border: 1px solid var(--night);
-    padding: 4px 10px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    color: #a78bfa;
-    animation: nightPulse 2s ease-in-out infinite;
-  }
-  .night-badge.show { display: flex; }
-  .night-badge::before { content: '🌙'; font-size: 12px; }
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.tab{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.12em;padding:8px 14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;text-transform:uppercase;white-space:nowrap;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover:not(.active){color:var(--text);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
 
-  @keyframes nightPulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
+.settings{background:var(--panel);border:1px solid var(--border);padding:18px;margin-bottom:12px;}
+.section-title{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.25em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.input-group{display:flex;flex-direction:column;gap:5px;}
+.input-label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;}
+.input-wrap{position:relative;}
+.input-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--muted);pointer-events:none;}
+input[type="number"],input[type="text"]{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:17px;padding:9px 10px 9px 26px;outline:none;transition:border-color 0.2s;-moz-appearance:textfield;}
+input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;}
+input:focus{border-color:var(--accent);}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);}
+.toggle-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--text);display:flex;align-items:center;gap:8px;}
+.toggle{position:relative;width:44px;height:22px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--dim);border:1px solid var(--border);cursor:pointer;transition:0.3s;}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;background:var(--muted);transition:0.3s;}
+.toggle input:checked+.toggle-slider{background:rgba(123,47,255,0.3);border-color:var(--night);}
+.toggle input:checked+.toggle-slider::before{transform:translateX(22px);background:var(--night);}
+.night-schedule{display:none;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.night-schedule.show{display:grid;}
+.wall-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.wall-input-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;}
 
-  /* ===== MAIN DISPLAY ===== */
-  .main-display {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 28px 24px 24px;
-    margin-bottom: 12px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.5s;
-  }
+.target-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.target-chip{background:var(--panel2);border:1px solid var(--border);padding:8px 6px;text-align:center;cursor:pointer;transition:all 0.15s;}
+.target-chip:hover{border-color:var(--accent3);}
+.target-chip.active{border-color:var(--accent3);background:rgba(200,245,0,0.08);}
+.chip-emoji{font-size:20px;display:block;margin-bottom:4px;}
+.chip-name{font-size:10px;color:var(--text);font-weight:700;}
+.chip-price{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);}
+.target-custom-row{display:grid;grid-template-columns:1fr 100px auto;gap:8px;align-items:end;}
+.btn-set-target{background:var(--accent3);color:var(--bg);border-color:var(--accent3);font-size:10px;padding:9px 10px;width:auto;grid-column:unset;white-space:nowrap;}
+.btn-set-target:hover{filter:brightness(1.1);}
 
-  .main-display::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    transform: scaleX(0);
-    transition: transform 0.4s ease, background 0.5s;
-  }
-  .main-display.running::before { transform: scaleX(1); }
-  .main-display.night::before { background: linear-gradient(90deg, transparent, var(--night), transparent); }
-  .main-display.night { border-color: rgba(123,47,255,0.4); }
+.reward-panel{background:var(--panel);border:1px solid var(--border);padding:18px;}
+.notif-permission{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--reward-soft);border:1px solid rgba(255,159,67,0.3);padding:10px 14px;margin-bottom:16px;}
+.notif-permission.granted{background:rgba(200,245,0,0.07);border-color:rgba(200,245,0,0.25);}
+.notif-permission.denied{background:rgba(255,107,0,0.07);border-color:rgba(255,107,0,0.25);}
+.notif-perm-text{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--reward);flex:1;}
+.notif-permission.granted .notif-perm-text{color:var(--accent3);}
+.notif-permission.denied .notif-perm-text{color:var(--accent2);}
+.btn-perm{background:var(--reward);color:var(--bg);border-color:var(--reward);font-size:9px;padding:6px 12px;width:auto;grid-column:unset;white-space:nowrap;}
+.reward-list{display:flex;flex-direction:column;gap:10px;}
+.reward-item{background:var(--panel2);border:1px solid var(--border);padding:12px 14px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;position:relative;overflow:hidden;transition:border-color 0.3s;}
+.reward-item.triggered{border-color:rgba(255,159,67,0.5);}
+.reward-item.triggered::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--reward),transparent);}
+.reward-name{font-size:13px;color:var(--text);font-weight:700;}
+.reward-amount-label{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px;}
+.reward-target{font-family:'Share Tech Mono',monospace;font-size:15px;color:var(--reward);text-align:right;white-space:nowrap;}
+.reward-progress-wrap{grid-column:span 3;height:3px;background:var(--border);margin-top:2px;}
+.reward-progress-bar{height:100%;background:linear-gradient(90deg,var(--reward),var(--accent3));transition:width 0.5s ease;max-width:100%;}
+.btn-del{background:transparent;color:var(--dim);border-color:var(--dim);font-size:14px;padding:4px 8px;width:auto;grid-column:unset;line-height:1;}
+.btn-del:hover{color:var(--accent2);border-color:var(--accent2);}
+.add-reward-form{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.add-reward-title{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;}
+.add-reward-row{display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:end;}
+.btn-add-reward{background:var(--reward);color:var(--bg);border-color:var(--reward);font-size:10px;padding:9px 12px;width:auto;grid-column:unset;white-space:nowrap;}
 
-  .rate-tag {
-    position: absolute;
-    top: 12px; left: 16px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+.reward-popup{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity 0.3s;background:rgba(0,0,0,0.6);}
+.reward-popup.show{opacity:1;pointer-events:auto;}
+.reward-popup-inner{background:var(--panel);border:2px solid var(--reward);padding:32px 40px;text-align:center;max-width:320px;animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 0 60px rgba(255,159,67,0.3);}
+@keyframes popIn{from{transform:scale(0.7);opacity:0}to{transform:scale(1);opacity:1}}
+.popup-emoji{font-size:48px;margin-bottom:12px;display:block;}
+.popup-title{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;}
+.popup-msg{font-size:17px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:18px;white-space:pre-line;}
+.popup-amount{font-family:'Share Tech Mono',monospace;font-size:28px;color:var(--reward);margin-bottom:20px;display:block;}
+.btn-popup-close{background:var(--reward);color:var(--bg);border-color:var(--reward);padding:10px 28px;font-size:11px;}
 
-  .rate-pill {
-    background: rgba(200,245,0,0.1);
-    border: 1px solid rgba(200,245,0,0.3);
-    color: var(--accent3);
-    padding: 2px 7px;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-  }
-  .rate-pill.night { background: rgba(123,47,255,0.2); border-color: var(--night); color: #a78bfa; }
-
-  .amount {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: clamp(48px, 12vw, 78px);
-    line-height: 1;
-    text-align: right;
-    color: var(--accent);
-    transition: color 0.5s;
-    white-space: nowrap;
-    margin-top: 10px;
-  }
-  .amount.night { color: #a78bfa; }
-
-  .amount .yen { font-size: 0.42em; vertical-align: top; margin-top: 8px; color: var(--muted); margin-right: 2px; }
-  .amount .dec { font-size: 0.38em; vertical-align: bottom; margin-bottom: 6px; color: var(--muted); }
-
-  @keyframes coinFlash {
-    0% { color: #fff; text-shadow: 0 0 20px #fff; }
-    100% { color: var(--accent); text-shadow: none; }
-  }
-  @keyframes nightFlash {
-    0% { color: #fff; text-shadow: 0 0 20px #a78bfa; }
-    100% { color: #a78bfa; text-shadow: none; }
-  }
-  .amount.flash { animation: coinFlash 0.2s ease-out; }
-  .amount.night.flash { animation: nightFlash 0.2s ease-out; }
-
-  /* ===== STATS ===== */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .stat-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 12px 10px;
-  }
-
-  .stat-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 8px;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 5px;
-    display: block;
-  }
-
-  .stat-val {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 19px;
-    color: var(--text);
-    line-height: 1;
-  }
-  .stat-val small { font-size: 11px; color: var(--muted); }
-
-  /* ===== NIGHT INFO BAR ===== */
-  .night-info {
-    display: none;
-    background: var(--night-soft);
-    border: 1px solid rgba(123,47,255,0.3);
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: #a78bfa;
-    letter-spacing: 0.1em;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .night-info.show { display: flex; }
-  .night-info .multiplier { font-size: 16px; color: var(--night); font-weight: bold; }
-
-  /* ===== TABS ===== */
-  .tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 14px;
-    gap: 0;
-  }
-
-  .tab {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    padding: 8px 16px;
-    color: var(--muted);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab:hover:not(.active) { color: var(--text); }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* ===== SETTINGS ===== */
-  .settings {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 18px;
-    margin-bottom: 12px;
-  }
-
-  .section-title {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.25em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .input-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .input-group { display: flex; flex-direction: column; gap: 5px; }
-
-  .input-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    color: var(--muted);
-    text-transform: uppercase;
-  }
-
-  .input-wrap { position: relative; }
-
-  .input-prefix {
-    position: absolute;
-    left: 10px; top: 50%;
-    transform: translateY(-50%);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    color: var(--muted);
-    pointer-events: none;
-  }
-
-  input[type="number"], input[type="text"] {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--accent);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 17px;
-    padding: 9px 10px 9px 26px;
-    outline: none;
-    transition: border-color 0.2s;
-    -moz-appearance: textfield;
-  }
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
-  input:focus { border-color: var(--accent); }
-
-  /* Toggle */
-  .toggle-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .toggle-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .toggle-label .icon { font-size: 14px; }
-
-  .toggle {
-    position: relative;
-    width: 44px; height: 22px;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: var(--dim);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: 0.3s;
-  }
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 16px; height: 16px;
-    left: 2px; top: 2px;
-    background: var(--muted);
-    transition: 0.3s;
-  }
-  .toggle input:checked + .toggle-slider { background: rgba(123,47,255,0.3); border-color: var(--night); }
-  .toggle input:checked + .toggle-slider::before { transform: translateX(22px); background: var(--night); }
-
-  /* Night schedule */
-  .night-schedule {
-    display: none;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-  }
-  .night-schedule.show { display: grid; }
-
-  /* ===== CONTROLS ===== */
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  button {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 13px;
-    border: 1px solid;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  button:active { transform: scale(0.97); }
-
-  .btn-start { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: bold; }
-  .btn-start:hover { filter: brightness(1.15); }
-  .btn-stop { background: transparent; color: var(--accent2); border-color: var(--accent2); }
-  .btn-stop:hover { background: rgba(255,107,0,0.1); }
-  .btn-reset { grid-column: span 2; background: transparent; color: var(--dim); border-color: var(--dim); font-size: 10px; padding: 9px; }
-  .btn-reset:hover { color: var(--muted); border-color: var(--muted); }
-
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-  /* ===== REWARD NOTIFICATIONS ===== */
-  .reward-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 18px;
-  }
-
-  /* Permission banner */
-  .notif-permission {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    background: var(--reward-soft);
-    border: 1px solid rgba(255,159,67,0.3);
-    padding: 10px 14px;
-    margin-bottom: 16px;
-  }
-  .notif-permission.granted { background: rgba(200,245,0,0.07); border-color: rgba(200,245,0,0.25); }
-  .notif-permission.denied { background: rgba(255,107,0,0.07); border-color: rgba(255,107,0,0.25); }
-
-  .notif-perm-text {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    color: var(--reward);
-    flex: 1;
-  }
-  .notif-permission.granted .notif-perm-text { color: var(--accent3); }
-  .notif-permission.denied .notif-perm-text { color: var(--accent2); }
-
-  .btn-perm {
-    background: var(--reward);
-    color: var(--bg);
-    border-color: var(--reward);
-    font-size: 9px;
-    padding: 6px 12px;
-    width: auto;
-    grid-column: unset;
-    white-space: nowrap;
-  }
-  .btn-perm:hover { filter: brightness(1.1); }
-
-  /* Reward list */
-  .reward-list { display: flex; flex-direction: column; gap: 10px; }
-
-  .reward-item {
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    padding: 12px 14px;
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s;
-  }
-  .reward-item.triggered { border-color: rgba(255,159,67,0.5); }
-  .reward-item.triggered::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--reward), transparent);
-  }
-
-  .reward-name {
-    font-size: 13px;
-    color: var(--text);
-    font-weight: 700;
-  }
-  .reward-amount-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 3px;
-  }
-
-  .reward-target {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 15px;
-    color: var(--reward);
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  /* Progress bar under reward item */
-  .reward-progress-wrap {
-    grid-column: span 3;
-    height: 3px;
-    background: var(--border);
-    margin-top: 2px;
-  }
-  .reward-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--reward), var(--accent3));
-    transition: width 0.5s ease;
-    max-width: 100%;
-  }
-
-  .btn-del {
-    background: transparent;
-    color: var(--dim);
-    border-color: var(--dim);
-    font-size: 14px;
-    padding: 4px 8px;
-    width: auto;
-    grid-column: unset;
-    line-height: 1;
-  }
-  .btn-del:hover { color: var(--accent2); border-color: var(--accent2); }
-
-  /* Add reward form */
-  .add-reward-form {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-  }
-
-  .add-reward-title {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-
-  .add-reward-row {
-    display: grid;
-    grid-template-columns: 1fr 120px auto;
-    gap: 8px;
-    align-items: end;
-  }
-
-  input.reward-input {
-    font-size: 14px;
-    padding: 8px 10px;
-  }
-
-  .btn-add-reward {
-    background: var(--reward);
-    color: var(--bg);
-    border-color: var(--reward);
-    font-size: 10px;
-    padding: 9px 12px;
-    width: auto;
-    grid-column: unset;
-    white-space: nowrap;
-  }
-  .btn-add-reward:hover { filter: brightness(1.1); }
-
-  /* Big reward popup overlay */
-  .reward-popup {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  .reward-popup.show { opacity: 1; pointer-events: auto; }
-
-  .reward-popup-inner {
-    background: var(--panel);
-    border: 2px solid var(--reward);
-    padding: 32px 40px;
-    text-align: center;
-    max-width: 320px;
-    position: relative;
-    animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    box-shadow: 0 0 60px rgba(255,159,67,0.3);
-  }
-
-  @keyframes popIn {
-    from { transform: scale(0.7); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-  }
-
-  .popup-emoji { font-size: 48px; margin-bottom: 12px; display: block; }
-  .popup-title {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  .popup-msg {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.4;
-    margin-bottom: 18px;
-  }
-  .popup-amount {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 28px;
-    color: var(--reward);
-    margin-bottom: 20px;
-    display: block;
-  }
-  .btn-popup-close {
-    background: var(--reward);
-    color: var(--bg);
-    border-color: var(--reward);
-    padding: 10px 28px;
-    font-size: 11px;
-  }
-  .btn-popup-close:hover { filter: brightness(1.1); }
-
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: 24px; left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--panel);
-    border: 1px solid var(--accent);
-    padding: 12px 20px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-    transition: transform 0.3s ease;
-    z-index: 100;
-    white-space: nowrap;
-    max-width: 90vw;
-    text-align: center;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.night-toast { border-color: var(--night); color: #a78bfa; }
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--accent);padding:12px 20px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:0.1em;color:var(--accent);transition:transform 0.3s ease;z-index:100;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.night-toast{border-color:var(--night);color:#a78bfa;}
+.toast.wall-toast{border-color:var(--wall);color:var(--wall);}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- Header -->
   <div class="header">
     <div class="logo">WAGE<span>/</span>PRO</div>
     <div class="night-badge" id="nightBadge">深夜手当 適用中</div>
   </div>
 
-  <!-- Main display -->
   <div class="main-display" id="mainDisplay">
-    <div class="rate-tag">
-      EARNED
-      <span class="rate-pill" id="ratePill">通常レート</span>
-    </div>
+    <div class="rate-tag">EARNED <span class="rate-pill" id="ratePill">通常レート</span></div>
     <div class="amount" id="amountEl">
       <span class="yen">¥</span><span id="intPart">0</span><span class="dec">.<span id="decPart">00</span></span>
     </div>
+    <div class="target-banner" id="targetBanner">
+      <div class="target-banner-left">
+        <span class="t-emoji" id="targetEmoji">🎯</span><span id="targetName">目標</span>まであと
+      </div>
+      <div class="target-banner-right" id="targetProgress">¥0</div>
+      <div class="target-progress-wrap">
+        <div class="target-progress-bar" id="targetProgressBar" style="width:0%"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- Night info bar -->
   <div class="night-info" id="nightInfo">
-    <span>🌙 深夜手当 22:00〜翌5:00 自動適用</span>
+    <span>🌙 深夜手当 自動適用中</span>
     <span class="multiplier" id="multiplierLabel">×1.25</span>
   </div>
 
-  <!-- Stats -->
+  <div class="wall-bar" id="wallBar">
+    <div class="wall-bar-top">
+      <span class="wall-bar-title">⚠ 103万円の壁</span>
+      <span>あと <span id="wallRemaining">¥0</span></span>
+    </div>
+    <div class="wall-progress-wrap">
+      <div class="wall-progress-bar" id="wallProgressBar" style="width:0%"></div>
+    </div>
+  </div>
+
   <div class="stats-row">
     <div class="stat-box">
       <span class="stat-label">経過時間</span>
@@ -684,100 +233,121 @@
     </div>
   </div>
 
-  <!-- Controls -->
+  <button class="share-btn" onclick="shareToTwitter()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="#1d9bf0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    X(Twitter)でシェアする
+  </button>
+
   <div class="controls">
     <button class="btn-start" id="btnStart" onclick="startCounter()">▶ スタート</button>
     <button class="btn-stop" id="btnStop" onclick="stopCounter()" disabled>■ ストップ</button>
     <button class="btn-reset" onclick="resetCounter()">↺ リセット</button>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('settings', this)">⚙ 設定</div>
-    <div class="tab" onclick="switchTab('reward', this)">🎁 ご褒美通知</div>
+    <div class="tab active" onclick="switchTab('settings',this)">⚙ 設定</div>
+    <div class="tab" onclick="switchTab('target',this)">🎯 目標物</div>
+    <div class="tab" onclick="switchTab('reward',this)">🎁 ご褒美</div>
   </div>
 
-  <!-- Settings tab -->
+  <!-- Settings -->
   <div class="tab-content active" id="tab-settings">
     <div class="settings">
       <div class="section-title">基本設定 // BASIC CONFIG</div>
       <div class="input-grid">
         <div class="input-group">
           <span class="input-label">通常時給 (円)</span>
-          <div class="input-wrap">
-            <span class="input-prefix">¥</span>
+          <div class="input-wrap"><span class="input-prefix">¥</span>
             <input type="number" id="wage" value="1200" min="1" step="50" oninput="updateCalc()">
           </div>
         </div>
         <div class="input-group">
           <span class="input-label">勤務時間 (h)</span>
-          <div class="input-wrap">
-            <span class="input-prefix">h</span>
+          <div class="input-wrap"><span class="input-prefix">h</span>
             <input type="number" id="hours" value="8" min="0.5" max="24" step="0.5" oninput="updateCalc()">
           </div>
         </div>
       </div>
-
-      <!-- Night shift toggle -->
       <div class="toggle-row">
-        <span class="toggle-label"><span class="icon">🌙</span> 深夜手当を自動適用（22:00〜翌5:00）</span>
-        <label class="toggle">
-          <input type="checkbox" id="nightToggle" checked onchange="toggleNight()">
-          <span class="toggle-slider"></span>
-        </label>
+        <span class="toggle-label">🌙 深夜手当を自動適用（22:00〜翌5:00）</span>
+        <label class="toggle"><input type="checkbox" id="nightToggle" checked onchange="toggleNight()"><span class="toggle-slider"></span></label>
       </div>
-
-      <!-- Night schedule settings -->
       <div class="night-schedule show" id="nightSchedule">
-        <div class="input-group">
-          <span class="input-label">開始時刻</span>
-          <div class="input-wrap">
-            <input type="number" id="nightStart" value="22" min="0" max="23" step="1" style="padding-left:10px" oninput="updateCalc()">
-          </div>
+        <div class="input-group"><span class="input-label">開始時刻</span>
+          <input type="number" id="nightStart" value="22" min="0" max="23" step="1" style="padding-left:10px" oninput="updateCalc()">
         </div>
-        <div class="input-group">
-          <span class="input-label">終了時刻</span>
-          <div class="input-wrap">
-            <input type="number" id="nightEnd" value="5" min="0" max="12" step="1" style="padding-left:10px" oninput="updateCalc()">
-          </div>
+        <div class="input-group"><span class="input-label">終了時刻</span>
+          <input type="number" id="nightEnd" value="5" min="0" max="12" step="1" style="padding-left:10px" oninput="updateCalc()">
         </div>
-        <div class="input-group">
-          <span class="input-label">倍率</span>
-          <div class="input-wrap">
-            <input type="number" id="nightRate" value="1.25" min="1.01" max="2" step="0.05" style="padding-left:10px" oninput="updateCalc()">
+        <div class="input-group"><span class="input-label">倍率</span>
+          <input type="number" id="nightRate" value="1.25" min="1.01" max="2" step="0.05" style="padding-left:10px" oninput="updateCalc()">
+        </div>
+      </div>
+      <div class="wall-section">
+        <div class="section-title" style="margin-bottom:8px;border:none;padding:0">⚠ 103万円の壁アラート</div>
+        <div class="toggle-row" style="border:none;padding:4px 0 0">
+          <span class="toggle-label">📊 年収103万円の壁を表示</span>
+          <label class="toggle"><input type="checkbox" id="wallToggle" checked onchange="updateWallBar()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="wall-input-row">
+          <div class="input-group"><span class="input-label">今年の累計収入 (円)</span>
+            <div class="input-wrap"><span class="input-prefix">¥</span>
+              <input type="number" id="yearEarned" value="0" min="0" step="1000" oninput="updateWallBar()">
+            </div>
+          </div>
+          <div class="input-group"><span class="input-label">上限金額 (円)</span>
+            <div class="input-wrap"><span class="input-prefix">¥</span>
+              <input type="number" id="wallLimit" value="1030000" min="1" step="10000" oninput="updateWallBar()">
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Reward tab -->
+  <!-- Target -->
+  <div class="tab-content" id="tab-target">
+    <div class="settings">
+      <div class="section-title">🎯 目標物換算モード</div>
+      <div class="target-grid" id="targetGrid"></div>
+      <div style="padding-top:12px;border-top:1px solid var(--border)">
+        <div class="add-reward-title">カスタム目標を設定</div>
+        <div class="target-custom-row">
+          <div class="input-group"><span class="input-label">目標の名前</span>
+            <input type="text" id="customTargetName" placeholder="マドリードのユニフォーム" style="padding-left:10px;font-size:13px">
+          </div>
+          <div class="input-group"><span class="input-label">金額</span>
+            <div class="input-wrap"><span class="input-prefix">¥</span>
+              <input type="number" id="customTargetAmount" value="15000" min="1" step="100">
+            </div>
+          </div>
+          <button class="btn-set-target" onclick="setCustomTarget()">設定</button>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn-reset" style="grid-column:unset;width:100%" onclick="clearTarget()">🎯 目標をクリア</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reward -->
   <div class="tab-content" id="tab-reward">
     <div class="reward-panel">
       <div class="section-title">🎁 ご褒美通知 // REWARD ALERTS</div>
-
-      <!-- Notification permission -->
       <div class="notif-permission" id="permBanner">
         <span class="notif-perm-text" id="permText">🔔 目標達成時にブラウザ通知を送ります</span>
         <button class="btn-perm" onclick="requestNotifPermission()">通知を許可する</button>
       </div>
-
-      <!-- Reward list -->
       <div class="reward-list" id="rewardList"></div>
-
-      <!-- Add reward form -->
       <div class="add-reward-form">
         <div class="add-reward-title">+ 新しいご褒美を追加</div>
         <div class="add-reward-row">
-          <div class="input-group">
-            <span class="input-label">ご褒美の名前</span>
-            <input type="text" id="rewardName" class="reward-input" placeholder="スタバ新作" maxlength="20" style="padding-left:10px">
+          <div class="input-group"><span class="input-label">ご褒美の名前</span>
+            <input type="text" id="rewardName" placeholder="スタバ新作" maxlength="20" style="padding-left:10px;font-size:14px">
           </div>
-          <div class="input-group">
-            <span class="input-label">目標金額</span>
-            <div class="input-wrap">
-              <span class="input-prefix">¥</span>
-              <input type="number" id="rewardAmount" class="reward-input" value="700" min="1" step="100">
+          <div class="input-group"><span class="input-label">目標金額</span>
+            <div class="input-wrap"><span class="input-prefix">¥</span>
+              <input type="number" id="rewardAmount" value="700" min="1" step="100">
             </div>
           </div>
           <button class="btn-add-reward" onclick="addReward()">追加</button>
@@ -788,7 +358,6 @@
 
 </div>
 
-<!-- Reward popup overlay -->
 <div class="reward-popup" id="rewardPopup">
   <div class="reward-popup-inner">
     <span class="popup-emoji" id="popupEmoji">🎉</span>
@@ -798,303 +367,261 @@
     <button class="btn-popup-close" onclick="closePopup()">やったー！</button>
   </div>
 </div>
-
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===== STATE =====
-  let running = false;
-  let startTime = null;
-  let pausedElapsed = 0;
-  let rafId = null;
-  let lastInt = -1;
-  let lastNight = null;
+let running=false,startTime=null,pausedElapsed=0,rafId=null;
+let lastInt=-1,lastNight=null,currentTarget=null,wallAlerted=false;
+let rewards=[
+  {id:1,name:'スタバ新作',amount:700,triggered:false,emoji:'☕'},
+  {id:2,name:'ラーメン大盛り',amount:1200,triggered:false,emoji:'🍜'},
+  {id:3,name:'今夜の打ち上げ',amount:3000,triggered:false,emoji:'🍻'},
+];
+let rewardIdCounter=10;
 
-  // Rewards
-  let rewards = [
-    { id: 1, name: 'スタバ新作', amount: 700,  triggered: false, emoji: '☕' },
-    { id: 2, name: 'ラーメン大盛り', amount: 1200, triggered: false, emoji: '🍜' },
-    { id: 3, name: '今夜の打ち上げ', amount: 3000, triggered: false, emoji: '🍻' },
-  ];
-  let rewardIdCounter = 10;
+const PRESET_TARGETS=[
+  {name:'スタバ新作',amount:700,emoji:'☕'},
+  {name:'マック',amount:900,emoji:'🍔'},
+  {name:'ランチ外食',amount:1200,emoji:'🍱'},
+  {name:'ラーメン',amount:1500,emoji:'🍜'},
+  {name:'居酒屋',amount:3000,emoji:'🍻'},
+  {name:'ユニフォーム',amount:15000,emoji:'⚽'},
+  {name:'スニーカー',amount:12000,emoji:'👟'},
+  {name:'ゲーム',amount:7000,emoji:'🎮'},
+  {name:'コンサート',amount:8000,emoji:'🎵'},
+];
+const REWARD_EMOJIS=['🎉','☕','🍜','🍣','🍺','🎮','👟','🛍','💪','🌮','🍕','🎁'];
 
-  const REWARD_EMOJIS = ['🎉','☕','🍜','🍣','🍺','🎮','👟','🛍','💪','🌮','🍕','🎁'];
+function getWage(){return parseFloat(document.getElementById('wage').value)||1200;}
+function getHours(){return parseFloat(document.getElementById('hours').value)||8;}
+function getNightEnabled(){return document.getElementById('nightToggle').checked;}
+function getNightStart(){return parseInt(document.getElementById('nightStart').value)||22;}
+function getNightEnd(){return parseInt(document.getElementById('nightEnd').value)||5;}
+function getNightRate(){return parseFloat(document.getElementById('nightRate').value)||1.25;}
+function getWallEnabled(){return document.getElementById('wallToggle').checked;}
+function getYearEarned(){return parseFloat(document.getElementById('yearEarned').value)||0;}
+function getWallLimit(){return parseFloat(document.getElementById('wallLimit').value)||1030000;}
 
-  // ===== HELPERS =====
-  function getWage() { return parseFloat(document.getElementById('wage').value) || 1200; }
-  function getHours() { return parseFloat(document.getElementById('hours').value) || 8; }
-  function getNightEnabled() { return document.getElementById('nightToggle').checked; }
-  function getNightStart() { return parseInt(document.getElementById('nightStart').value) || 22; }
-  function getNightEnd() { return parseInt(document.getElementById('nightEnd').value) || 5; }
-  function getNightRate() { return parseFloat(document.getElementById('nightRate').value) || 1.25; }
+function isNightTime(){
+  if(!getNightEnabled())return false;
+  const h=new Date().getHours(),s=getNightStart(),e=getNightEnd();
+  return s>e?(h>=s||h<e):(h>=s&&h<e);
+}
+function currentRate(){return isNightTime()?getWage()*getNightRate():getWage();}
+function formatTime(ms){
+  const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function showToast(msg,cls=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show'+(cls?' '+cls:'');
+  clearTimeout(t._timer);t._timer=setTimeout(()=>{t.className='toast';},3500);
+}
+function getCurrentEarned(){
+  if(!running&&pausedElapsed===0)return 0;
+  const ms=running?pausedElapsed+(Date.now()-startTime):pausedElapsed;
+  return ms/1000*currentRate()/3600;
+}
 
-  function isNightTime() {
-    if (!getNightEnabled()) return false;
-    const h = new Date().getHours();
-    const s = getNightStart(), e = getNightEnd();
-    return s > e ? (h >= s || h < e) : (h >= s && h < e);
+function updateNightUI(night){
+  const badge=document.getElementById('nightBadge'),info=document.getElementById('nightInfo');
+  const md=document.getElementById('mainDisplay'),amount=document.getElementById('amountEl');
+  const pill=document.getElementById('ratePill'),mult=document.getElementById('multiplierLabel');
+  if(night){
+    badge.classList.add('show');info.classList.add('show');md.classList.add('night');amount.classList.add('night');
+    pill.className='rate-pill night';pill.textContent=`深夜×${getNightRate()}`;
+    mult.textContent=`×${getNightRate()}`;document.body.classList.add('night-mode');
+  } else {
+    badge.classList.remove('show');info.classList.remove('show');md.classList.remove('night');amount.classList.remove('night');
+    pill.className='rate-pill';pill.textContent='通常レート';document.body.classList.remove('night-mode');
   }
+}
 
-  function currentRate() {
-    return isNightTime() ? getWage() * getNightRate() : getWage();
-  }
+function updateWallBar(sessionEarned=0){
+  const bar=document.getElementById('wallBar');
+  if(!getWallEnabled()){bar.classList.remove('show');return;}
+  const limit=getWallLimit(),total=getYearEarned()+sessionEarned;
+  const remaining=Math.max(0,limit-total),pct=Math.min(100,total/limit*100);
+  bar.classList.add('show');
+  document.getElementById('wallRemaining').textContent=pct>=100?'超過！':'¥'+Math.ceil(remaining).toLocaleString('ja-JP');
+  document.getElementById('wallProgressBar').style.width=pct+'%';
+  if(pct>=90)bar.classList.add('danger');else bar.classList.remove('danger');
+  if(!wallAlerted&&pct>=90&&pct<100){wallAlerted=true;showToast('⚠ 103万円の壁まであと10%！調整が必要かも','wall-toast');}
+  if(pct>=100)showToast('🚨 103万円の壁を超えました！扶養から外れます！','wall-toast');
+}
 
-  function formatTime(ms) {
-    const s = Math.floor(ms / 1000);
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  }
+function renderTargetChips(){
+  document.getElementById('targetGrid').innerHTML=PRESET_TARGETS.map((t,i)=>`
+    <div class="target-chip ${currentTarget&&currentTarget.name===t.name?'active':''}" onclick="setTarget(${i})">
+      <span class="chip-emoji">${t.emoji}</span>
+      <div class="chip-name">${t.name}</div>
+      <div class="chip-price">¥${t.amount.toLocaleString()}</div>
+    </div>`).join('');
+}
+function setTarget(idx){
+  currentTarget=PRESET_TARGETS[idx];
+  updateTargetBanner(getCurrentEarned());renderTargetChips();
+  showToast(`🎯 目標：${currentTarget.emoji} ${currentTarget.name}（¥${currentTarget.amount.toLocaleString()}）`);
+}
+function setCustomTarget(){
+  const name=document.getElementById('customTargetName').value.trim();
+  const amount=parseInt(document.getElementById('customTargetAmount').value);
+  if(!name){showToast('⚠ 目標の名前を入力してね');return;}
+  if(!amount||amount<=0){showToast('⚠ 金額を入力してね');return;}
+  currentTarget={name,amount,emoji:'🎯'};
+  updateTargetBanner(getCurrentEarned());renderTargetChips();
+  showToast(`🎯 ${name}（¥${amount.toLocaleString()}）を設定！`);
+}
+function clearTarget(){
+  currentTarget=null;
+  document.getElementById('targetBanner').classList.remove('show');
+  renderTargetChips();showToast('🎯 目標をクリアしました');
+}
+function updateTargetBanner(earned){
+  if(!currentTarget){document.getElementById('targetBanner').classList.remove('show');return;}
+  const remaining=Math.max(0,currentTarget.amount-earned);
+  const pct=Math.min(100,earned/currentTarget.amount*100);
+  document.getElementById('targetEmoji').textContent=currentTarget.emoji;
+  document.getElementById('targetName').textContent=currentTarget.name;
+  document.getElementById('targetProgress').textContent=remaining>0?`あと ¥${Math.ceil(remaining).toLocaleString()}`:'✅ 達成！';
+  document.getElementById('targetProgressBar').style.width=pct+'%';
+  document.getElementById('targetBanner').classList.add('show');
+}
 
-  function showToast(msg, type = '') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show' + (type ? ' ' + type : '');
-    clearTimeout(t._timer);
-    t._timer = setTimeout(() => { t.className = 'toast'; }, 3500);
-  }
-
-  function getCurrentEarned() {
-    if (!running && pausedElapsed === 0) return 0;
-    const totalMs = running ? pausedElapsed + (Date.now() - startTime) : pausedElapsed;
-    return totalMs / 1000 * currentRate() / 3600;
-  }
-
-  // ===== NIGHT MODE UI =====
-  function updateNightUI(night) {
-    const badge = document.getElementById('nightBadge');
-    const info = document.getElementById('nightInfo');
-    const md = document.getElementById('mainDisplay');
-    const amount = document.getElementById('amountEl');
-    const pill = document.getElementById('ratePill');
-    const mult = document.getElementById('multiplierLabel');
-    if (night) {
-      badge.classList.add('show'); info.classList.add('show');
-      md.classList.add('night'); amount.classList.add('night');
-      pill.className = 'rate-pill night'; pill.textContent = `深夜×${getNightRate()}`;
-      mult.textContent = `×${getNightRate()}`; document.body.classList.add('night-mode');
-    } else {
-      badge.classList.remove('show'); info.classList.remove('show');
-      md.classList.remove('night'); amount.classList.remove('night');
-      pill.className = 'rate-pill'; pill.textContent = '通常レート';
-      document.body.classList.remove('night-mode');
+function checkRewards(earned){
+  rewards.forEach(r=>{
+    if(!r.triggered&&earned>=r.amount){
+      r.triggered=true;
+      document.getElementById('popupEmoji').textContent=r.emoji;
+      document.getElementById('popupMsg').textContent=`${r.name}の金額に到達！\nお疲れさま、こーすけ！`;
+      document.getElementById('popupAmount').textContent=`¥${r.amount.toLocaleString()}`;
+      document.getElementById('rewardPopup').classList.add('show');
+      if(Notification.permission==='granted')new Notification(`${r.emoji} ご褒美タイム！`,{body:`${r.name}（¥${r.amount.toLocaleString()}）に到達！お疲れさま🎉`});
+      renderRewards();
     }
+  });
+}
+function closePopup(){document.getElementById('rewardPopup').classList.remove('show');}
+function addReward(){
+  const name=document.getElementById('rewardName').value.trim();
+  const amount=parseInt(document.getElementById('rewardAmount').value);
+  if(!name){showToast('⚠ ご褒美の名前を入力してね');return;}
+  if(!amount||amount<=0){showToast('⚠ 金額を入力してね');return;}
+  const emoji=REWARD_EMOJIS[Math.floor(Math.random()*REWARD_EMOJIS.length)];
+  rewards.push({id:++rewardIdCounter,name,amount,triggered:getCurrentEarned()>=amount,emoji});
+  rewards.sort((a,b)=>a.amount-b.amount);
+  document.getElementById('rewardName').value='';
+  renderRewards();showToast(`${emoji} 「${name}」を追加！`);
+}
+function deleteReward(id){rewards=rewards.filter(r=>r.id!==id);renderRewards();}
+function renderRewards(){
+  const list=document.getElementById('rewardList'),earned=getCurrentEarned();
+  if(rewards.length===0){list.innerHTML=`<div style="text-align:center;padding:24px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted)">ご褒美を追加してみよう！</div>`;return;}
+  list.innerHTML=rewards.map(r=>{
+    const pct=Math.min(100,earned/r.amount*100),rem=Math.max(0,r.amount-earned);
+    return `<div class="reward-item ${r.triggered?'triggered':''}" id="item-${r.id}">
+      <div><div class="reward-name">${r.emoji} ${r.name}</div>
+      <div class="reward-amount-label">${r.triggered?'✅ 達成！':`あと ¥${Math.ceil(rem).toLocaleString()}`}</div></div>
+      <div class="reward-target">¥${r.amount.toLocaleString()}</div>
+      <button class="btn-del" onclick="deleteReward(${r.id})">✕</button>
+      <div class="reward-progress-wrap"><div class="reward-progress-bar" id="bar-${r.id}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function shareToTwitter(){
+  const earned=Math.floor(getCurrentEarned());
+  const target=currentTarget?`\n🎯 目標「${currentTarget.name}」まであと ¥${Math.max(0,Math.ceil(currentTarget.amount-earned)).toLocaleString()}！`:'';
+  const text=`💰 今日のバイトで ¥${earned.toLocaleString()} 稼いだ！${target}\n\n#時給カウンター #バイト #大学生`;
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent('https://todo-app-wtbq.vercel.app')}`, '_blank');
+}
+
+function update(){
+  if(!running)return;
+  const totalMs=pausedElapsed+(Date.now()-startTime);
+  const night=isNightTime(),rate=currentRate(),earned=totalMs/1000*rate/3600;
+  if(night!==lastNight){
+    updateNightUI(night);
+    if(night)showToast('🌙 深夜手当が適用されました！','night-toast');
+    else showToast('☀️ 通常レートに戻りました');
+    lastNight=night;
   }
-
-  // ===== REWARD CHECKS =====
-  function checkRewards(earned) {
-    rewards.forEach(r => {
-      if (!r.triggered && earned >= r.amount) {
-        r.triggered = true;
-        triggerReward(r);
-        renderRewards();
-      }
-    });
+  const earnedInt=Math.floor(earned),earnedDec=String(Math.floor((earned-earnedInt)*100)).padStart(2,'0');
+  if(earnedInt!==lastInt){
+    const el=document.getElementById('amountEl');
+    el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
+    lastInt=earnedInt;
+    updateTargetBanner(earned);checkRewards(earned);
+    rewards.forEach(r=>{const b=document.getElementById(`bar-${r.id}`);if(b)b.style.width=Math.min(100,earned/r.amount*100)+'%';});
+    updateWallBar(earned);
   }
+  document.getElementById('intPart').textContent=earnedInt.toLocaleString('ja-JP');
+  document.getElementById('decPart').textContent=earnedDec;
+  document.getElementById('elapsedEl').textContent=formatTime(totalMs);
+  document.getElementById('perSecEl').textContent=(rate/3600).toFixed(3);
+  document.getElementById('effectiveEl').textContent=Math.round(rate).toLocaleString('ja-JP');
+  rafId=requestAnimationFrame(update);
+}
 
-  function triggerReward(r) {
-    // Popup
-    document.getElementById('popupEmoji').textContent = r.emoji;
-    document.getElementById('popupMsg').textContent = `${r.name}の金額に到達！\nお疲れさま、こーすけ！`;
-    document.getElementById('popupAmount').textContent = `¥${r.amount.toLocaleString()}`;
-    document.getElementById('rewardPopup').classList.add('show');
-
-    // Browser notification
-    if (Notification.permission === 'granted') {
-      new Notification(`${r.emoji} ご褒美タイム！`, {
-        body: `${r.name}（¥${r.amount.toLocaleString()}）に到達したで！お疲れさま🎉`,
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>'
-      });
-    }
-  }
-
-  function closePopup() {
-    document.getElementById('rewardPopup').classList.remove('show');
-  }
-
-  // ===== MAIN LOOP =====
-  function update() {
-    if (!running) return;
-
-    const now = Date.now();
-    const totalMs = pausedElapsed + (now - startTime);
-    const totalSec = totalMs / 1000;
-    const night = isNightTime();
-    const rate = currentRate();
-    const ratePerSec = rate / 3600;
-    const earned = totalSec * ratePerSec;
-
-    if (night !== lastNight) {
-      updateNightUI(night);
-      if (night) showToast('🌙 深夜手当が適用されました！', 'night-toast');
-      else showToast('☀️ 通常レートに戻りました');
-      lastNight = night;
-    }
-
-    const earnedInt = Math.floor(earned);
-    const earnedDec = String(Math.floor((earned - earnedInt) * 100)).padStart(2, '0');
-
-    if (earnedInt !== lastInt) {
-      const el = document.getElementById('amountEl');
-      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-      lastInt = earnedInt;
-      // Update reward progress bars
-      updateRewardBars(earned);
-      // Check triggers
-      checkRewards(earned);
-    }
-
-    document.getElementById('intPart').textContent = earnedInt.toLocaleString('ja-JP');
-    document.getElementById('decPart').textContent = earnedDec;
-    document.getElementById('elapsedEl').textContent = formatTime(totalMs);
-    document.getElementById('perSecEl').textContent = ratePerSec.toFixed(3);
-    document.getElementById('effectiveEl').textContent = Math.round(rate).toLocaleString('ja-JP');
-
-    rafId = requestAnimationFrame(update);
-  }
-
-  function updateRewardBars(earned) {
-    rewards.forEach(r => {
-      const bar = document.getElementById(`bar-${r.id}`);
-      if (bar) bar.style.width = Math.min(100, earned / r.amount * 100) + '%';
-    });
-  }
-
-  // ===== CONTROLS =====
-  function startCounter() {
-    if (running) return;
-    running = true; startTime = Date.now(); lastNight = null;
-    document.getElementById('mainDisplay').classList.add('running');
-    document.getElementById('btnStart').disabled = true;
-    document.getElementById('btnStop').disabled = false;
-    update();
-  }
-
-  function stopCounter() {
-    if (!running) return;
-    running = false; pausedElapsed += Date.now() - startTime;
-    cancelAnimationFrame(rafId);
-    document.getElementById('mainDisplay').classList.remove('running');
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnStop').disabled = true;
-    document.getElementById('btnStart').textContent = '▶ 再開';
-  }
-
-  function resetCounter() {
-    running = false; cancelAnimationFrame(rafId);
-    pausedElapsed = 0; startTime = null; lastInt = -1; lastNight = null;
-    rewards.forEach(r => r.triggered = false);
-    document.getElementById('intPart').textContent = '0';
-    document.getElementById('decPart').textContent = '00';
-    document.getElementById('elapsedEl').textContent = '00:00:00';
-    document.getElementById('mainDisplay').classList.remove('running','night');
-    document.getElementById('amountEl').classList.remove('night');
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnStop').disabled = true;
-    document.getElementById('btnStart').textContent = '▶ スタート';
-    updateNightUI(false); updateCalc(); renderRewards();
-  }
-
-  function updateCalc() {
-    const rate = currentRate();
-    document.getElementById('effectiveEl').textContent = Math.round(rate).toLocaleString('ja-JP');
-    document.getElementById('perSecEl').textContent = (rate / 3600).toFixed(3);
-  }
-
-  function toggleNight() {
-    const show = document.getElementById('nightToggle').checked;
-    document.getElementById('nightSchedule').className = 'night-schedule' + (show ? ' show' : '');
-    updateCalc();
-  }
-
-  // ===== TAB =====
-  function switchTab(id, el) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('tab-' + id).classList.add('active');
-  }
-
-  // ===== NOTIFICATIONS =====
-  function requestNotifPermission() {
-    if (!('Notification' in window)) {
-      showToast('⚠ このブラウザは通知に対応していません');
-      return;
-    }
-    Notification.requestPermission().then(updatePermBanner);
-  }
-
-  function updatePermBanner(perm) {
-    perm = perm || Notification.permission;
-    const banner = document.getElementById('permBanner');
-    const text = document.getElementById('permText');
-    const btn = banner.querySelector('.btn-perm');
-    if (perm === 'granted') {
-      banner.className = 'notif-permission granted';
-      text.textContent = '✅ 通知が許可されています';
-      if (btn) btn.remove();
-    } else if (perm === 'denied') {
-      banner.className = 'notif-permission denied';
-      text.textContent = '❌ 通知がブロックされています（ブラウザ設定から許可してください）';
-      if (btn) btn.remove();
-    }
-  }
-
-  // ===== REWARDS =====
-  function addReward() {
-    const name = document.getElementById('rewardName').value.trim();
-    const amount = parseInt(document.getElementById('rewardAmount').value);
-    if (!name) { showToast('⚠ ご褒美の名前を入力してね'); return; }
-    if (!amount || amount <= 0) { showToast('⚠ 金額を入力してね'); return; }
-
-    const emoji = REWARD_EMOJIS[Math.floor(Math.random() * REWARD_EMOJIS.length)];
-    const earned = getCurrentEarned();
-    rewards.push({ id: ++rewardIdCounter, name, amount, triggered: earned >= amount, emoji });
-    rewards.sort((a, b) => a.amount - b.amount);
-
-    document.getElementById('rewardName').value = '';
-    renderRewards();
-    showToast(`${emoji} 「${name}」を追加しました！`);
-  }
-
-  function deleteReward(id) {
-    rewards = rewards.filter(r => r.id !== id);
-    renderRewards();
-  }
-
-  function renderRewards() {
-    const list = document.getElementById('rewardList');
-    const earned = getCurrentEarned();
-
-    if (rewards.length === 0) {
-      list.innerHTML = `<div style="text-align:center;padding:24px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.15em">ご褒美を追加してみよう！</div>`;
-      return;
-    }
-
-    list.innerHTML = rewards.map(r => {
-      const pct = Math.min(100, earned / r.amount * 100);
-      const remaining = Math.max(0, r.amount - earned);
-      return `
-        <div class="reward-item ${r.triggered ? 'triggered' : ''}" id="item-${r.id}">
-          <div>
-            <div class="reward-name">${r.emoji} ${r.name}</div>
-            <div class="reward-amount-label">${r.triggered ? '✅ 達成！' : `あと ¥${Math.ceil(remaining).toLocaleString()}`}</div>
-          </div>
-          <div class="reward-target">¥${r.amount.toLocaleString()}</div>
-          <button class="btn-del" onclick="deleteReward(${r.id})">✕</button>
-          <div class="reward-progress-wrap">
-            <div class="reward-progress-bar" id="bar-${r.id}" style="width:${pct}%"></div>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  // ===== INIT =====
+function startCounter(){
+  if(running)return;
+  running=true;startTime=Date.now();lastNight=null;wallAlerted=false;
+  document.getElementById('mainDisplay').classList.add('running');
+  document.getElementById('btnStart').disabled=true;
+  document.getElementById('btnStop').disabled=false;
+  update();
+}
+function stopCounter(){
+  if(!running)return;
+  running=false;pausedElapsed+=Date.now()-startTime;cancelAnimationFrame(rafId);
+  document.getElementById('mainDisplay').classList.remove('running');
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStop').disabled=true;
+  document.getElementById('btnStart').textContent='▶ 再開';
+}
+function resetCounter(){
+  running=false;cancelAnimationFrame(rafId);
+  pausedElapsed=0;startTime=null;lastInt=-1;lastNight=null;wallAlerted=false;
+  rewards.forEach(r=>r.triggered=false);
+  document.getElementById('intPart').textContent='0';
+  document.getElementById('decPart').textContent='00';
+  document.getElementById('elapsedEl').textContent='00:00:00';
+  document.getElementById('mainDisplay').classList.remove('running','night');
+  document.getElementById('amountEl').classList.remove('night');
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStop').disabled=true;
+  document.getElementById('btnStart').textContent='▶ スタート';
+  updateNightUI(false);updateCalc();renderRewards();updateTargetBanner(0);updateWallBar(0);
+}
+function updateCalc(){
+  const rate=currentRate();
+  document.getElementById('effectiveEl').textContent=Math.round(rate).toLocaleString('ja-JP');
+  document.getElementById('perSecEl').textContent=(rate/3600).toFixed(3);
+  updateWallBar(getCurrentEarned());
+}
+function toggleNight(){
+  document.getElementById('nightSchedule').className='night-schedule'+(document.getElementById('nightToggle').checked?' show':'');
   updateCalc();
-  renderRewards();
-  updatePermBanner();
-  setInterval(() => { if (!running) updateNightUI(isNightTime()); }, 30000);
-  updateNightUI(isNightTime());
+}
+function switchTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');document.getElementById('tab-'+id).classList.add('active');
+}
+function requestNotifPermission(){
+  if(!('Notification' in window)){showToast('⚠ このブラウザは通知に対応していません');return;}
+  Notification.requestPermission().then(updatePermBanner);
+}
+function updatePermBanner(perm){
+  perm=perm||Notification.permission;
+  const banner=document.getElementById('permBanner'),text=document.getElementById('permText'),btn=banner.querySelector('.btn-perm');
+  if(perm==='granted'){banner.className='notif-permission granted';text.textContent='✅ 通知が許可されています';if(btn)btn.remove();}
+  else if(perm==='denied'){banner.className='notif-permission denied';text.textContent='❌ ブラウザ設定から通知を許可してください';if(btn)btn.remove();}
+}
+
+updateCalc();renderRewards();renderTargetChips();updatePermBanner();updateWallBar(0);
+setInterval(()=>{if(!running)updateNightUI(isNightTime());},30000);
+updateNightUI(isNightTime());
 </script>
 </body>
 </html>
